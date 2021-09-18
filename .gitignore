@@ -1,0 +1,7 @@
+.git/
+.idea/
+dataset/
+outputs/
+__pycache__/
+assets/
+*.ll
