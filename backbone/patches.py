@@ -14,7 +14,6 @@ def DivideInPatches(dataset, original_height, original_width, size, stride):
 
 
 def AssemblePatches(patches_tensor, number_of_images, channel, height, width, patch_size, stride):
-    # reshape output to match F.fold input
     temp = patches_tensor.contiguous().view(number_of_images, channel, -1, patch_size*patch_size)
 #     print(temp.shape) # [number_of_images, C, number_patches_all, patch_size*patch_size]
     temp = temp.permute(0, 1, 3, 2) 

@@ -1,6 +1,5 @@
 import torch
-from tqdm import tqdm
-import backbone as bc
+import backbone as b
 
 from variables import *
 
@@ -29,6 +28,6 @@ def test(model, device, test_loader, codes):
     codes['logσ2'].append(torch.cat(logvars))
     test_loss /= len(test_loader.dataset)
     print(f'====> Test set loss: {test_loss:.4f}')
-    bc.display_images(x, x_hat, 0, outputs_dir + date + '_testphase' + str(0) + plot_extension, True)
+    b.display_images(x, x_hat, 0, b.assemble_pathname('Testphase' + str(0)), True)
 
     return test_loss, test_x, test_x_hat, codes, means, logvars

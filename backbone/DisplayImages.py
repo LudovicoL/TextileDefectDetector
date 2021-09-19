@@ -2,12 +2,12 @@ from matplotlib import pyplot as plt
 from variables import *
 
 def assemble_pathname(filename):
-    return outputs_dir + date + filename + plot_extension
+    return outputs_dir + '/' + date + '/' + filename + plot_extension
 
 def display_images(in_, out, epoch, filename, count=False):
     color_count = 'chocolate'
 
-    f = plt.figure()
+    fig = plt.figure()
     in_pic = in_.data.cpu().view(-1, patch_size, patch_size)
     plt.style.use('grayscale')
     plt.suptitle('Epoch ' + str(epoch) + ' – real test data / reconstructions', color='k', fontsize=16)
@@ -24,7 +24,7 @@ def display_images(in_, out, epoch, filename, count=False):
         plt.axis('off')
         if count:
             plt.title(str(i-3), color=color_count)
-    f.savefig(filename)
+    fig.savefig(filename)
 
 def plot_histogram(original, reconstructed, filename):
     fig = plt.figure(figsize=(15,5))
@@ -33,9 +33,9 @@ def plot_histogram(original, reconstructed, filename):
     img1 = original.cpu().detach().numpy()
     img2 = reconstructed.cpu().detach().numpy()
     fig.add_subplot(rows, columns, 1)
-    plt.hist(img1)
+    plt.hist(img1)  # plt.hist(img1, range=[0, 1])
     plt.title("Original")
     fig.add_subplot(rows, columns, 2)
-    plt.hist(img2)
+    plt.hist(img2)  # plt.hist(img2, range=[0, 1])
     plt.title("Reconstructed")
     fig.savefig(filename)

@@ -1,6 +1,6 @@
 import torch
 from tqdm import tqdm
-import backbone as bc
+import backbone as b
 
 from variables import *
 
@@ -38,6 +38,7 @@ def train(model, epochs, device, train_loader, validation_loader):
             # ===================log========================
             training_loss = train_loss / len(train_loader.dataset)
             print(f'====> Epoch: {epoch} Average loss: {training_loss:.4f}')
+            b.display_images(x, x_hat, epoch, b.assemble_pathname('Trainphase' + str(epoch)), True)
 
             # Testing on validation set
             means, logvars = list(), list()
@@ -60,6 +61,6 @@ def train(model, epochs, device, train_loader, validation_loader):
             codes['logσ2'].append(torch.cat(logvars))
             validation_loss /= len(validation_loader.dataset)
             print(f'====> Validation set loss: {validation_loss:.4f}')
-            bc.display_images(x, x_hat, epoch, outputs_dir + date + '_trainphase' + str(epoch) + plot_extension, True)
+            b.display_images(x, x_hat, epoch, b.assemble_pathname('Validationphase' + str(epoch)), True)
     
     return training_loss, validation_loss, train_x, train_x_hat, validation_x, validation_x_hat, codes, means, logvars
