@@ -16,7 +16,6 @@ import backbone as b
 from variables import *
 #############################################################
 
-
 # Set manual seed
 torch.manual_seed(1)
 torch.cuda.manual_seed(1)
@@ -92,14 +91,14 @@ model = b.VariationalAutoencoder(latent_space, learning_rate).to(device)
 
 training_loss, validation_loss, train_x, train_x_hat, validation_x, validation_x_hat, train_codes, train_means, train_logvars = b.train(model, epochs, device, train_loader, validation_loader)
 
-path = outputs_dir + '/' + date + '/'
-torch.save(model.state_dict(), path + 'state_dict')
-torch.save(training_loss, path + 'training_loss.pt')
-torch.save(validation_loss, path + 'validation_loss.pt')
-torch.save(train_x, path + 'train_x.pt')
-torch.save(train_x_hat, path + 'train_x_hat.pt')
-torch.save(validation_x, path + 'validation_x.pt')
-torch.save(validation_x_hat, path + 'validation_x_hat.pt')
-torch.save(train_codes, path + 'train_codes.pt')
-torch.save(train_means, path + 'train_means.pt')
-torch.save(train_logvars, path + 'train_logvars.pt')
+
+torch.save(model.state_dict(), model_path + 'state_dict')
+torch.save(training_loss, model_path + 'training_loss.pt')
+torch.save(validation_loss, model_path + 'validation_loss.pt')
+torch.save(train_x, model_path + 'train_x.pt')
+torch.save(train_x_hat, model_path + 'train_x_hat.pt')
+torch.save(validation_x, model_path + 'validation_x.pt')
+torch.save(validation_x_hat, model_path + 'validation_x_hat.pt')
+torch.save(train_codes, model_path + 'train_codes.pt')
+torch.save(train_means, model_path + 'train_means.pt')
+torch.save(train_logvars, model_path + 'train_logvars.pt')

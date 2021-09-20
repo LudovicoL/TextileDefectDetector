@@ -5,3 +5,4 @@ outputs/
 __pycache__/
 assets/
 *.ll
+runbg.sh

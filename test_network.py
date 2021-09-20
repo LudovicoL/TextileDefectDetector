@@ -64,9 +64,8 @@ torch.cat(test_temp, out=test_patches)
 test_loader = DataLoader(test_patches, batch_size=batch_size)
 
 model = b.VariationalAutoencoder(latent_space, learning_rate).to(device)
-path = outputs_dir + '/' + date + '/'
-model.load_state_dict(torch.load(path + 'state_dict'))
-train_codes = torch.load(path + 'train_codes.pt')
+model.load_state_dict(torch.load(model_path + 'state_dict'))
+train_codes = torch.load(model_path + 'train_codes.pt')
 
 test_loss, test_x, test_x_hat, test_codes, test_means, test_logvars = b.test(model, device, test_loader, train_codes)
 
@@ -86,3 +85,5 @@ fig.savefig(b.assemble_pathname('Test_reconstructed_image28'))
 
 b.plot_histogram(tensor_original.__getitem__(28)[0], tensor_reconstructed.__getitem__(28)[0], b.assemble_pathname('Histograms_image28'))
 
+# ssim = b.ssim(tensor_original.__getitem__(28), tensor_reconstructed.__getitem__(28), val_range=255)
+# print('SSIM: ' + {ssim})
