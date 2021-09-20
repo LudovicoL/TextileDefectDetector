@@ -3,7 +3,6 @@ import torch.nn.functional as F
 import math
 
 
-
 def gaussian(window_size, sigma):
     """
     Generates a list of Tensor values drawn from a gaussian distribution with standard
@@ -14,6 +13,19 @@ def gaussian(window_size, sigma):
     gauss =  torch.Tensor([math.exp(-(x - window_size//2)**2/float(2*sigma**2)) for x in range(window_size)])
     return gauss/gauss.sum()
 
+
+
+def create_window(window_size, channel=1):
+
+    # Generate an 1D tensor containing values sampled from a gaussian distribution
+    _1d_window = gaussian(window_size=window_size, sigma=1.5).unsqueeze(1)
+    
+    # Converting to 2D  
+    _2d_window = _1d_window.mm(_1d_window.t()).float().unsqueeze(0).unsqueeze(0)
+     
+    window = torch.Tensor(_2d_window.expand(channel, 1, window_size, window_size).contiguous())
+
+    return window
 
 
 def ssim(img1, img2, val_range, window_size=16, window=None, size_average=True, full=False):
@@ -29,14 +41,8 @@ def ssim(img1, img2, val_range, window_size=16, window=None, size_average=True, 
 
     # if window is not provided, init one
     if window is None: 
-        real_size = min(window_size, height, width) # window should be atleast 11x11
-        # Generate an 1D tensor containing values sampled from a gaussian distribution
-        _1d_window = gaussian(window_size=window_size, sigma=1.5).unsqueeze(1)
-    
-        # Converting to 2D  
-        _2d_window = _1d_window.mm(_1d_window.t()).float().unsqueeze(0).unsqueeze(0)
-     
-        window = torch.Tensor(_2d_window.expand(channels, 1, window_size, window_size).contiguous()).to(img1.device)
+        real_size = min(window_size, height, width) # window should be atleast 11x11 
+        window = create_window(real_size, channel=channels).to(img1.device)
     
     # calculating the mu parameter (locally) for both images using a gaussian filter 
     # calculates the luminosity params

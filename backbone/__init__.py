@@ -4,3 +4,4 @@ from .VAE import VariationalAutoencoder
 from .DisplayImages import display_images, plot_histogram, assemble_pathname
 from .train import train
 from .test import test
+from .SSIM import ssim
