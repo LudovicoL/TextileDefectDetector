@@ -61,27 +61,16 @@ def CreateAitexDataset(AitexFolder):
     os.makedirs(validation_folder, exist_ok=True)
     os.makedirs(test_folder, exist_ok=True)
 
-    train_range = [0, len(nodefect_images) - int(len(nodefect_images) * 40 / 100)]  # 60% train set without defects
-    validation_range_without_defect = [len(nodefect_images) - int(len(nodefect_images) * 40 / 100),
-                                       len(nodefect_images) - int(
-                                           len(nodefect_images) * 20 / 100)]  # 20% train set without defects
-    test_range_without_defect = [len(nodefect_images) - int(len(nodefect_images) * 20 / 100),
-                                 len(nodefect_images)]  # 20% train set without defects
-    validation_range_with_defect = [0, len(defect_images) - int(
-        len(defect_images) * 60 / 100)]  # 40% validation set with defects
-    test_range_with_defect = [len(defect_images) - int(len(defect_images) * 60 / 100),
-                              len(defect_images)]  # 60% validation set with defects
+    train_range = [0, len(nodefect_images) - int(len(nodefect_images) * 20 / 100)]  # 60% train set without defects
+    validation_range = [len(nodefect_images) - int(len(nodefect_images) * 20 / 100),
+                                 len(nodefect_images)]  # 20% validation set without defects
 
     for i in range(train_range[0], train_range[1]):
         shutil.copyfile(NODefect_path + nodefect_images[i], train_folder + nodefect_images[i].split('/')[1])
-    for i in range(validation_range_without_defect[0], validation_range_without_defect[1]):
+    for i in range(validation_range[0], validation_range[1]):
         shutil.copyfile(NODefect_path + nodefect_images[i], validation_folder + nodefect_images[i].split('/')[1])
-    for i in range(validation_range_with_defect[0], validation_range_with_defect[1]):
-        shutil.copyfile(Defect_path + defect_images[i], validation_folder + defect_images[i])
-    for i in range(test_range_without_defect[0], test_range_without_defect[1]):
-        shutil.copyfile(NODefect_path + nodefect_images[i], test_folder + nodefect_images[i].split('/')[1])
-    for i in range(test_range_with_defect[0], test_range_with_defect[1]):
-        shutil.copyfile(Defect_path + defect_images[i], test_folder + defect_images[i])
+    for i in defect_images:
+        shutil.copyfile(Defect_path + i, test_folder + i)
 
     DeleteFolder(Defect_path)
     DeleteFolder(NODefect_path)

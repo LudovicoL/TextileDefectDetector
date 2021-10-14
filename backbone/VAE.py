@@ -53,12 +53,11 @@ class VariationalAutoencoder(nn.Module):
         :return: (Tensor) List of latent codes
         """
         result = self.encoder(input)
-
+        
         # Split the result into mu and var components
         # of the latent Gaussian distribution
         mu = self.fc_mu(result)
         logvar = self.fc_var(result)
-
         return [mu, logvar]
 
 
@@ -95,7 +94,7 @@ class VariationalAutoencoder(nn.Module):
     def forward(self, input):
         mu, logvar = self.encode(input)
         z = self.reparameterise(mu, logvar)
-        return self.decoder(z), mu, logvar
+        return self.decoder(z), mu, logvar, z
 
 
 

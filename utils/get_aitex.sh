@@ -1,4 +1,7 @@
 #!/bin/bash
+if [ ! -d "../dataset" ]; then
+  mkdir "../dataset"
+fi
 cd ../dataset
 mkdir AITEX
 cd ./AITEX
