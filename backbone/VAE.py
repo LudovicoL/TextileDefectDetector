@@ -1,5 +1,9 @@
 import torch
 from torch import nn
+from config import patch_size
+from torch.nn import functional as F
+
+
 
 class VariationalAutoencoder(nn.Module):
 
@@ -43,7 +47,8 @@ class VariationalAutoencoder(nn.Module):
         decoder_layers.append(nn.Sigmoid())
         self.decoder = nn.Sequential(*decoder_layers)
 
-
+        # for the gaussian likelihood
+        self.log_scale = nn.Parameter(torch.Tensor([0.0]))
 
     def encode(self, input):
         """
@@ -88,26 +93,53 @@ class VariationalAutoencoder(nn.Module):
             return eps.mul_(std).add_(mu)
         else:
             return mu
-
-
-
+    
     def forward(self, input):
         mu, logvar = self.encode(input)
         z = self.reparameterise(mu, logvar)
         return self.decoder(z), mu, logvar, z
+    
+    def kl_divergence(self, z, mu, std):
+        # --------------------------
+        # Monte carlo KL divergence
+        # --------------------------
+        # 1. define the first two probabilities (in this case Normal for both)
+        p = torch.distributions.Normal(torch.zeros_like(mu), torch.ones_like(std))
+        q = torch.distributions.Normal(mu, std)
 
+        # 2. get the probabilities from the equation
+        log_qzx = q.log_prob(z)
+        log_pz = p.log_prob(z)
 
+        # kl
+        kl = (log_qzx - log_pz)
+        kl = kl.sum(-1)
+        return kl
 
-    def loss_function(self, x_hat, x, mu, logvar, β=1):
-        # Reconstruction + β * KL divergence losses summed over all elements and batch
-        BCE = nn.functional.binary_cross_entropy(
-            x_hat, x, reduction='sum'
-        )
-        #         CE = torch.sum(torch.sum(- x_hat * torch.nn.functional.log_softmax(x, -1), -1).reshape(-1) ,-1)
-        #         loss = nn.CrossEntropyLoss()
-        #         CE = loss(x_hat, x.long())
-        KLD = 0.5 * torch.sum(logvar.exp() - logvar - 1 + mu.pow(2))
-        return BCE + β * KLD
+    def gaussian_likelihood(self, x_hat, logscale, x):
+        scale = torch.exp(logscale)
+        mean = x_hat
+        dist = torch.distributions.Normal(mean, scale)
+
+        # measure prob of seeing image under p(x|z)
+        log_pxz = dist.log_prob(x)
+        return log_pxz.sum(dim=(1, 2, 3))
+
+    def loss_function(self, x_hat, x, mu, logvar):
+        std = torch.exp(logvar / 2)
+        q = torch.distributions.Normal(mu, std)
+        z = q.rsample()
+
+        # reconstruction loss
+        recon_loss = self.gaussian_likelihood(x_hat, self.log_scale, x)
+
+        # kl
+        kl = self.kl_divergence(z, mu, std)
+
+        # elbo
+        elbo = (kl - recon_loss)
+        elbo = elbo.mean()
+        return elbo
 
 
 
@@ -151,3 +183,12 @@ class ReshapeLayer(nn.Module):
 
     def forward(self, x):
         return x.view(self.shape)
+
+
+def add_noise(inputs, noise_factor=0.3):
+    '''
+    source: https://ichi.pro/it/denoising-autoencoder-in-pytorch-sul-set-di-dati-mnist-184080287458686
+    '''
+    noisy = inputs + torch.randn_like(inputs) * noise_factor
+    noisy = torch.clip(noisy, 0., 1.)
+    return noisy

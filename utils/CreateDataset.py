@@ -2,6 +2,7 @@ import os           # To read the file
 import random       # shuffle
 import shutil       # To copy the file
 from PIL import Image
+import numpy as np
 
 
 def Reformat_Image(ImageFilePath, new_width, new_height, color, offset):
@@ -33,6 +34,28 @@ def DeleteFolder(path):
     shutil.rmtree(path)
     print(path + ' deleted!')
 
+def MergeMasks(name):
+    mask1 = Image.open(name+'_mask1.png').convert('L')
+    mask2 = Image.open(name+'_mask2.png').convert('L')
+    mask1 = np.array(mask1)
+    mask2 = np.array(mask2)
+    mask = np.add(mask1, mask2)
+    mask = Image.fromarray(mask)
+    mask.save(name+'_mask.png',"PNG")
+    os.remove(name+'_mask1.png')
+    os.remove(name+'_mask2.png')
+
+def BinarizeMasks(Mask_path):
+    thresh = 128
+    maxval = 255
+
+    all_imgs = sorted(os.listdir(Mask_path))
+    for i in all_imgs:
+        im_gray = np.array(Image.open(Mask_path+i).convert('L'))
+        im_bool = im_gray > thresh
+        im_bin = (im_gray > thresh) * maxval
+        Image.fromarray(np.uint8(im_bin)).save(Mask_path+i)
+
 def CreateAitexDataset(AitexFolder):
     Defect_path = AitexFolder + 'Defect_images/'
     NODefect_path = AitexFolder + 'NODefect_images/'
@@ -43,6 +66,7 @@ def CreateAitexDataset(AitexFolder):
 
     Reformat_Image(Defect_path + '0094_027_05.png', 4096, 256, 'white', 'right')
     Reformat_Image(Mask_path + '0094_027_05_mask.png', 4096, 256, 'black', 'right')
+    os.remove(Defect_path + '0100_025_08.png')
 
     defect_images = os.listdir(Defect_path)
     nodefect_images = []
@@ -74,8 +98,11 @@ def CreateAitexDataset(AitexFolder):
 
     DeleteFolder(Defect_path)
     DeleteFolder(NODefect_path)
-    # deleteFolder(Mask_path)
 
+    MergeMasks(Mask_path+'0044_019_04')   # Merge and delete 0044_019_04.png masks:
+    MergeMasks(Mask_path+'0097_030_03')   # Merge and delete 0097_030_03.png masks:
+
+    BinarizeMasks(Mask_path)
 
 
 random.seed(10)

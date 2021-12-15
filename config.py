@@ -1,52 +1,21 @@
-import os
 from datetime import datetime
-import sys
 import torch
-
-def folders_in(path_to_parent):
-    for fname in os.listdir(path_to_parent):
-        if os.path.isdir(os.path.join(path_to_parent,fname)):
-            yield os.path.join(path_to_parent,fname)
-
-
+    
 ########################################################
 # Control variables
+
+date = datetime.now()
+date = date.strftime("%Y-%m-%d_%H-%M-%S")
 
 # Defining the device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 debugging_mode = True
-outputs_dir = './outputs/'
-os.makedirs(outputs_dir, exist_ok=True)
 
-if debugging_mode:
-    isTrain = False
-    for i in range(len(sys.argv)):
-        if 'train_network.py' in sys.argv[i]:
-            date = datetime.now()
-            date = date.strftime("%Y-%m-%d_%H-%M-%S")
-            outputs_dir = outputs_dir + date + '/'
-            os.mkdir(outputs_dir)
-            isTrain = True
-            break 
-    if not isTrain:
-        if len(list(folders_in(outputs_dir))) == 0:
-            print('Run \'train_network.py\' first!')
-            sys.exit(-1)
-        else:
-            outputs_dir = sorted(list(folders_in(outputs_dir)))[-1]
-            outputs_dir = outputs_dir + '/'
-else:
-    for i in range(len(sys.argv)):
-        if 'test_network.py' in sys.argv[i]:
-            if os.path.isfile('state_dict'):
-                print('Run \'train_network.py\' first!')
-                sys.exit(-1)
-            break
-
-plot_extension = '.pdf'
-allprint = True
-allFigures = True
+plot_extension = '.png'
+allprint = False
+allFigures = False
+Telegram_messages = False
 seed = 0
 
 ########################################################
@@ -61,10 +30,47 @@ mask_dir = './dataset/AITEX/Mask_images'
 # Network parameters
 
 latent_space = 25
-learning_rate = 1e-3
-epochs = 19
 
 patch_size = 16
-stride = 16
+stride = patch_size
 
-batch_size = 64
+batch_size = 256
+
+learning_rate = 1e-4
+
+ANOMALY_THRESHOLD = 2
+
+BIC_MAX_RANGE = 100
+GMM_N_COMPONENTS = 98
+GMM_COVARIANCE = 'full'
+
+########################################################
+class SingletonMeta(type):
+    """
+    The Singleton class can be implemented in different ways in Python. Some
+    possible methods include: base class, decorator, metaclass. We will use the
+    metaclass because it is best suited for this purpose.
+    """
+
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        """
+        Possible changes to the value of the `__init__` argument do not affect
+        the returned instance.
+        """
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+        return cls._instances[cls]
+
+
+class Config(metaclass=SingletonMeta):
+    def setOutputDir(self, outputs_dir):
+        self.outputs_dir = outputs_dir
+    def getOutputDir(self):
+        return self.outputs_dir
+    def setInfoFile(self, info_file):
+        self.info_file = info_file
+    def getInfoFile(self):
+        return self.info_file

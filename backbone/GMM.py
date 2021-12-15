@@ -6,6 +6,9 @@ from scipy.special import logsumexp
 import itertools
 from matplotlib import pyplot as plt
 
+from sklearn import mixture
+import pickle
+
 import backbone as b
 from config import *
 
@@ -461,15 +464,47 @@ class GaussianMixture(torch.nn.Module):
 
         return (center.unsqueeze(0)*(x_max - x_min) + x_min)
     
-def calculateBestGMM(x, n_features, device):
+def calculate_matmul_n_times(n_components, mat_a, mat_b):
+    """
+    Calculate matrix product of two matrics with mat_a[0] >= mat_b[0].
+    Bypasses torch.matmul to reduce memory footprint.
+    args:
+        mat_a:      torch.Tensor (n, k, 1, d)
+        mat_b:      torch.Tensor (1, k, d, d)
+    """
+    res = torch.zeros(mat_a.shape).double().to(mat_a.device)
+    
+    for i in range(n_components):
+        mat_a_i = mat_a[:, i, :, :].squeeze(-2)
+        mat_b_i = mat_b[0, i, :, :].squeeze()
+        res[:, i, :, :] = mat_a_i.mm(mat_b_i).unsqueeze(1)
+    
+    return res
+
+
+def calculate_matmul(mat_a, mat_b):
+    """
+    Calculate matrix product of two matrics with mat_a[0] >= mat_b[0].
+    Bypasses torch.matmul to reduce memory footprint.
+    args:
+        mat_a:      torch.Tensor (n, k, 1, d)
+        mat_b:      torch.Tensor (n, k, d, 1)
+    """
+    assert mat_a.shape[-2] == 1 and mat_b.shape[-1] == 1
+    return torch.sum(mat_a.squeeze(-2) * mat_b.squeeze(-1), dim=2, keepdim=True)
+
+
+def calculateBestGMM_pytorch(x, n_features, device):
+    info_file = Config().getInfoFile()
     lowest_bic = np.infty
     bic = []
-    n_components_range = range(1, 8)
+    n_components_range = range(1, BIC_MAX_RANGE+1)
     best_n_components = 0
     covariance = ''
     cv_types = ['diag', 'full']
     for cv_type in cv_types:
         for n_components in n_components_range:
+            print(cv_type +'\t\t' + str(n_components))
             # Fit a Gaussian mixture with EM
             gmm = GaussianMixture(n_components=n_components, n_features=n_features, covariance_type=cv_type).to(device)
             gmm.fit(x)
@@ -503,36 +538,78 @@ def calculateBestGMM(x, n_features, device):
         plt.legend([b[0] for b in bars], cv_types)
         fig.savefig(b.assemble_pathname('BIC'))
         plt.close('all')
-    if allprint: print('Optimal number of Gaussian Mixture: ' + str(best_n_components))
+    b.myPrint('Optimal number of Gaussian Mixture: ' + str(best_n_components), info_file)
+    b.myPrint('Optimal covariance type of Gaussian Mixture: ' + str(covariance), info_file)
+    outputs_dir = Config().getOutputDir()
+    torch.save(best_gmm.state_dict(), outputs_dir + 'gmm_model.pt')
+    torch.save(best_n_components, outputs_dir + 'gmm_n_components.pt')
+    torch.save(covariance, outputs_dir + 'gmm_covariance.pt')
     return best_gmm, best_n_components, covariance
 
 
-def calculate_matmul_n_times(n_components, mat_a, mat_b):
-    """
-    Calculate matrix product of two matrics with mat_a[0] >= mat_b[0].
-    Bypasses torch.matmul to reduce memory footprint.
-    args:
-        mat_a:      torch.Tensor (n, k, 1, d)
-        mat_b:      torch.Tensor (1, k, d, d)
-    """
-    res = torch.zeros(mat_a.shape).double().to(mat_a.device)
+
+
+def calculateBestGMM_sklearn(x, n_features):
+    info_file = Config().getInfoFile()
+    lowest_bic = np.infty
+    bic = []
+    n_components_range = range(1, BIC_MAX_RANGE+1)
+    best_n_components = 0
+    covariance = ''
+    cv_types = ["spherical", "tied", "diag", "full"]
+    for cv_type in cv_types:
+        for n_components in n_components_range:
+            print(cv_type +'\t\t' + str(n_components))
+            # Fit a Gaussian mixture with EM
+            gmm = mixture.GaussianMixture(n_components=n_components, covariance_type=cv_type)
+            gmm.fit(x)
+            bic.append(gmm.bic(x))
+            if bic[-1] < lowest_bic:
+                lowest_bic = bic[-1]
+                best_gmm = gmm
+                best_n_components = n_components
+                covariance = cv_type
+    if allFigures:
+        bic = np.array(bic)
+        bars = []
+        color_iter = itertools.cycle(['navy', 'turquoise', 'cornflowerblue', 'darkorange'])
+        # Plot the BIC scores
+        fig=plt.figure(figsize=(8, 6))
+        
+        for i, (cv_type, color) in enumerate(zip(cv_types, color_iter)):
+            xpos = np.array(n_components_range) + .2 * (i - 2)
+            bars.append(plt.bar(xpos, bic[i * len(n_components_range):
+                                        (i + 1) * len(n_components_range)],
+                                width=.2, color=color))
+        plt.xticks(n_components_range)
+        plt.ylim([bic.min() * 1.01 - .01 * bic.max(), bic.max()])
+        plt.title('BIC score per model')
+        xpos = np.mod(bic.argmin(), len(n_components_range)) + .65 +\
+            .2 * np.floor(bic.argmin() / len(n_components_range))
+        plt.text(xpos, bic.min() * 0.97 + .03 * bic.max(), '*', fontsize=14)
+        plt.xlabel('Number of components')
+        plt.legend([b[0] for b in bars], cv_types)
+        fig.savefig(b.assemble_pathname('BIC'))
+        plt.close('all')
+    b.myPrint('Optimal number of Gaussian Mixture: ' + str(best_n_components), info_file)
+    b.myPrint('Optimal covariance type of Gaussian Mixture: ' + str(covariance), info_file)
+    outputs_dir = Config().getOutputDir()
+    pickle.dump(best_gmm, open(outputs_dir + 'gmm_model.sav', 'wb'))
+    torch.save(best_n_components, outputs_dir + 'gmm_n_components.pt')
+    torch.save(covariance, outputs_dir + 'gmm_covariance.pt')
+    return best_gmm, best_n_components, covariance
+
+
+def calculateBestGMM(x, n_features, device, gmm_torch):
+    if gmm_torch:
+        return calculateBestGMM_pytorch(x, n_features, device)
+    else:
+        return calculateBestGMM_sklearn(x, n_features)
+
+def GMM(gmm_torch, gmm_n_components, gmm_covariance, n_features=None, device=None):
+    if gmm_torch:
+        gmm = GaussianMixture(n_components=gmm_n_components, n_features=n_features, covariance_type=gmm_covariance).to(device)
+    else:
+        gmm = mixture.GaussianMixture(n_components=gmm_n_components, covariance_type=gmm_covariance)
+    return gmm
     
-    for i in range(n_components):
-        mat_a_i = mat_a[:, i, :, :].squeeze(-2)
-        mat_b_i = mat_b[0, i, :, :].squeeze()
-        res[:, i, :, :] = mat_a_i.mm(mat_b_i).unsqueeze(1)
-    
-    return res
-
-
-def calculate_matmul(mat_a, mat_b):
-    """
-    Calculate matrix product of two matrics with mat_a[0] >= mat_b[0].
-    Bypasses torch.matmul to reduce memory footprint.
-    args:
-        mat_a:      torch.Tensor (n, k, 1, d)
-        mat_b:      torch.Tensor (n, k, d, 1)
-    """
-    assert mat_a.shape[-2] == 1 and mat_b.shape[-1] == 1
-    return torch.sum(mat_a.squeeze(-2) * mat_b.squeeze(-1), dim=2, keepdim=True)
-

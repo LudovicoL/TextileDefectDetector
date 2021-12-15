@@ -2,7 +2,8 @@ from matplotlib import pyplot as plt
 from config import *
 
 def assemble_pathname(filename):
-    return outputs_dir + filename + plot_extension
+    outputs_dir = Config().getOutputDir()
+    return outputs_dir + 'images/' + filename + plot_extension
 
 def display_images(in_, out, epoch, filename, count=False):
     color_count = 'chocolate'

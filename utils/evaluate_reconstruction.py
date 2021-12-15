@@ -1,18 +1,17 @@
 # All imports
 import torch
+import torchvision
 from torchvision import transforms
 from matplotlib import pyplot as plt
 import numpy as np
 
+import sys
+sys.path.append('..')
 import backbone as b
 from config import *
 
-def main():
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[-1],std=[2])
-    ])
 
+def main():
 
     test_dataset = b.CustomDataSet(test_dir, transform=transform)
     channels = test_dataset[0].shape[0]
@@ -26,12 +25,9 @@ def main():
     
     print('Start plotting all figures...')
     for i in range(len(test_dataset)):
-        fig = plt.figure()
-        plt.imshow(np.transpose(test_dataset.__getitem__(i).cpu().detach().numpy(), (1, 2, 0)), cmap='gray')
-        fig.savefig(b.assemble_pathname('Test_image'+str(i)+'original'))
-        plt.clf()
-        plt.imshow(np.transpose(tensor_reconstructed.__getitem__(i).cpu().detach().numpy(), (1, 2, 0)), cmap='gray')
-        fig.savefig(b.assemble_pathname('Test_image'+str(i)+'reconstructed'))
+        
+        torchvision.utils.save_image(test_dataset.__getitem__(i), b.assemble_pathname('Test_image'+str(i)+'original'))
+        torchvision.utils.save_image(tensor_reconstructed.__getitem__(i), b.assemble_pathname('Test_image'+str(i)+'reconstructed'))
         plt.close('all')
 
     print('Start plotting the histogram...')
