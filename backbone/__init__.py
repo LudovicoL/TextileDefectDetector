@@ -1,4 +1,4 @@
-from .CustomDataset import CustomDataSet, augmentationDataset
+from .CustomDataset import CustomDataSet, augmentationDataset, resize
 from .patches import DivideInPatches, AssemblePatches, getPosition, countAnomalies
 from .VAE import VariationalAutoencoder, add_noise
 from .DisplayImages import display_images, plot_couple, assemble_pathname

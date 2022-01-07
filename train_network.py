@@ -67,16 +67,18 @@ def main(info_file):
     channels = train_dataset[0].shape[0]
     original_height = train_dataset[0].shape[1]
     original_width = train_dataset[0].shape[2]
-    train_dataset = b.augmentationDataset(train_dataset)
+    train_dataset, train_widths = b.resize(train_dataset, original_width, original_height)
+    validation_dataset, validation_widths = b.resize(validation_dataset, original_width, original_height)
+    train_dataset, train_widths = b.augmentationDataset(train_dataset)
 
     b.myPrint('There are ' + str(len(train_dataset)) + ' train images with size [W]' + str(original_width) + ' × [H]' + str(original_height) + ' × [C]' + str(channels), info_file)
     b.myPrint('There are ' + str(len(validation_dataset)) + ' validation images with size [W]' + str(original_width) + ' × [H]' + str(original_height) + ' × [C]' + str(channels), info_file)
 
-    train_patches = b.DivideInPatches(train_dataset, original_height, original_width, channels, patch_size, stride)
-    validation_patches = b.DivideInPatches(validation_dataset, original_height, original_width, channels, patch_size, stride)
+    train_patches = b.DivideInPatches(train_dataset, channels, patch_size, stride)
+    validation_patches = b.DivideInPatches(validation_dataset, channels, patch_size, stride)
 
-    train_patches = torch.stack(train_patches).reshape(-1, channels, patch_size, patch_size)    
-    validation_patches = torch.stack(validation_patches).reshape(-1, channels, patch_size, patch_size)
+    train_patches = torch.cat(train_patches, dim=0).reshape(-1, channels, patch_size, patch_size)
+    validation_patches = torch.cat(validation_patches, dim=0).reshape(-1, channels, patch_size, patch_size)
 
     b.myPrint('Number of patches in trainset: ' + str(train_patches.shape[0]), info_file)
     b.myPrint('Number of patches in validationset: ' + str(validation_patches.shape[0]), info_file)
@@ -86,22 +88,20 @@ def main(info_file):
     
     if not load_state:
         model = b.VariationalAutoencoder(latent_space, learning_rate).to(device)
-        training_loss, validation_loss, train_x_hat, validation_x_hat, train_features, validation_features = b.train(model, epochs, device, train_loader, validation_loader)
+        train_x_hat, validation_x_hat, train_features, validation_features = b.train(model, epochs, device, train_loader, validation_loader)
         
-        train_x_hat = torch.stack(train_x_hat).reshape(-1, channels, patch_size, patch_size)
-        validation_x_hat = torch.stack(validation_x_hat).reshape(-1, channels, patch_size, patch_size)
-        train_features = torch.stack(train_features)
-        validation_features = torch.stack(validation_features)
+        train_x_hat = torch.cat(train_x_hat, dim=0).reshape(-1, channels, patch_size, patch_size)
+        validation_x_hat = torch.cat(validation_x_hat, dim=0).reshape(-1, channels, patch_size, patch_size)
+        train_features = torch.cat(train_features, dim=0)
+        validation_features = torch.cat(validation_features, dim=0)
         torch.save(model.state_dict(), outputs_dir + 'vae_state_dict.pt')
-        torch.save(training_loss, outputs_dir + 'training_loss.pt')
-        torch.save(validation_loss, outputs_dir + 'validation_loss.pt')
         torch.save(train_x_hat, outputs_dir + 'train_x_hat.pt')
         torch.save(validation_x_hat, outputs_dir + 'validation_x_hat.pt')
         torch.save(train_features, outputs_dir + 'train_features.pt')
         torch.save(validation_features, outputs_dir + 'validation_features.pt')
 
-        
-        tensor_reconstructed = b.AssemblePatches(validation_x_hat, len(validation_dataset), channels, original_height, original_width, patch_size, stride)
+        print(validation_widths[0])
+        tensor_reconstructed = b.AssemblePatches(validation_x_hat[:validation_widths[0]], 1, channels, original_height, validation_widths[0], patch_size, stride)
         torchvision.utils.save_image(tensor_reconstructed.__getitem__(0), b.assemble_pathname('Validation_dataset_image0_reconstructed'))
     else:
         # To avoid train phase:
@@ -113,12 +113,14 @@ def main(info_file):
         validation_features = torch.load(outputs_dir + 'validation_features.pt')
     
     if show_reconstructed:
-        tensor_reconstructed = b.AssemblePatches(train_x_hat, len(train_dataset), channels, original_height, original_width, patch_size, stride)
-    
         b.myPrint('Start saving all reconstructed images...', info_file)
+        j = 0
         for i in range(len(train_dataset)):
+            print(j)
+            tensor_reconstructed = b.AssemblePatches(train_x_hat[j:j+train_widths[i]], 1, channels, original_height, train_widths[i], patch_size, stride)
             torchvision.utils.save_image(train_dataset.__getitem__(i)[0], b.assemble_pathname('Train_image'+str(i)+'original'))
-            torchvision.utils.save_image(tensor_reconstructed.__getitem__(i), b.assemble_pathname('Train_image'+str(i)+'reconstructed'))
+            torchvision.utils.save_image(tensor_reconstructed.__getitem__(0), b.assemble_pathname('Train_image'+str(i)+'reconstructed'))
+            j += train_widths[i]
     
 
     b.myPrint('Start computing SSIM for trainset...', info_file)
@@ -127,7 +129,6 @@ def main(info_file):
     for i in range(len(train_patches)):
         score, _ = b.calculate_ssim(train_patches[i], train_x_hat[i])
         train_ssim.append(score)
-    # np.savetxt(outputs_dir + 'ssim.txt', train_ssim)
     torch.save(train_ssim, outputs_dir + 'train_ssim.pt')
     b.plot_ssim_histogram(train_ssim, b.assemble_pathname('SSIM_Train'), 'SSIM for trainset')           # Plot train SSIM histogram
     b.myPrint('...start computing SSIM for validationset...', info_file)
@@ -199,7 +200,7 @@ def main(info_file):
             j += 0.1
         fp.append((alpha * validation_ssim_masks[i] + beta * validation_s)/(max))
     np.savetxt(outputs_dir + 'fp.txt', np.asarray(fp).reshape(-1, 256))
-    # print(np.max(fp))
+    print(np.max(fp))
     torch.save(np.max(fp), outputs_dir + 'segmantion_map_threshold.pt')
 
     b.myPrint('...end computing GMM.', info_file)

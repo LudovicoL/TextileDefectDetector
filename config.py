@@ -14,16 +14,18 @@ debugging_mode = True
 
 plot_extension = '.png'
 allprint = False
-allFigures = False
-Telegram_messages = False
+allFigures = True
+Telegram_messages = True
 seed = 0
+
+TYPE_OF_TEXTILE = '06/'
 
 ########################################################
 # Datasets
 # AITEX
-train_dir = './dataset/AITEX/trainset'
-validation_dir = './dataset/AITEX/validationset'
-test_dir = './dataset/AITEX/testset'
+train_dir = './dataset/AITEX/trainset/' + TYPE_OF_TEXTILE
+validation_dir = './dataset/AITEX/validationset/' + TYPE_OF_TEXTILE
+test_dir = './dataset/AITEX/testset/' + TYPE_OF_TEXTILE
 mask_dir = './dataset/AITEX/Mask_images'
 
 ########################################################

@@ -63,16 +63,17 @@ def main(info_file):
     original_width = test_dataset[0][0].shape[2]
 
     b.myPrint('There are ' + str(len(test_dataset)) + ' test images with size [W]' + str(original_width) + ' × [H]' + str(original_height) + ' × [C]' + str(channels), info_file)
+    test_dataset, test_widths = b.resize(test_dataset, original_width, original_height, True)
+
+    test_patches, mask_test_patches = b.DivideInPatches(test_dataset, channels, patch_size, stride, True)
     
 
-    test_patches, mask_test_patches = b.DivideInPatches(test_dataset, original_height, original_width, channels, patch_size, stride, True)
-    
-
-    test_patches = torch.stack(test_patches).reshape(-1, channels, patch_size, patch_size)
+    test_patches = torch.cat(test_patches, dim=0).reshape(-1, channels, patch_size, patch_size)
     number_of_patches = len(test_patches)
     b.myPrint('Number of patches: ' + str(number_of_patches), info_file)
     
-    mask_test_patches = torch.stack(mask_test_patches).reshape(-1, channels, patch_size, patch_size)
+    # mask_test_patches = torch.stack(mask_test_patches).reshape(-1, channels, patch_size, patch_size)
+    mask_test_patches = torch.cat(mask_test_patches, dim=0).reshape(-1, channels, patch_size, patch_size)
     torch.save(mask_test_patches, outputs_dir + 'mask_test_patches.pt')
     anomalies_number, defective = b.countAnomalies(mask_test_patches)
     b.myPrint('Number of patches with defect: ' + str(anomalies_number) + '/' + str(len(mask_test_patches)), info_file)
@@ -84,12 +85,14 @@ def main(info_file):
     model = b.VariationalAutoencoder(latent_space, learning_rate).to(device)
     model.load_state_dict(torch.load(outputs_dir + 'vae_state_dict.pt'))
     
-    test_loss, test_x_hat, test_features = b.test(model, device, test_loader)
+    test_x_hat, test_features = b.test(model, device, test_loader)
     torch.save(test_x_hat, outputs_dir + 'test_x_hat.pt')
 
-    test_x_hat = torch.stack(test_x_hat).reshape(-1, channels, patch_size, patch_size)
-    test_features = torch.stack(test_features)
+    test_x_hat = torch.cat(test_x_hat, dim=0).reshape(-1, channels, patch_size, patch_size)
+    test_features = torch.cat(test_features, dim=0)
     
+    torch.set_printoptions(profile="full")
+
     
     b.myPrint('Start computing SSIM for testset...', info_file)
     test_ssim = []
@@ -98,38 +101,39 @@ def main(info_file):
         score, diff = b.calculate_ssim(test_patches[i], test_x_hat[i])
         test_ssim.append(score)
         test_ssim_diff.append(diff)
-    # np.savetxt(outputs_dir + 'test_ssim.txt', test_ssim)
     torch.save(test_ssim, outputs_dir + 'test_ssim.pt')
     torch.save(test_ssim_diff, outputs_dir + 'test_ssim_diff.pt')
     test_ssim_diff_tensor = torch.Tensor(test_ssim_diff).unsqueeze(3).permute(0, 3, 1, 2)
     b.plot_ssim_histogram(test_ssim, b.assemble_pathname('SSIM_Test'), 'SSIM for testset')      # Plot test SSIM histogram
     
-       
+    
     print('Start saving all SSIM masks...')
-    tensor_reconstructed = b.AssemblePatches(test_ssim_diff_tensor, len(test_dataset), channels, original_height, original_width, patch_size, stride)
+    j = 0
     for i in range(len(test_dataset)):
-        torchvision.utils.save_image(tensor_reconstructed.__getitem__(i), b.assemble_pathname('SSIM_Mask_'+str(i)))
+        tensor_reconstructed = b.AssemblePatches(test_ssim_diff_tensor[j:j+test_widths[i]], 1, channels, original_height, test_widths[i], patch_size, stride)
+        torchvision.utils.save_image(tensor_reconstructed.__getitem__(0), b.assemble_pathname('SSIM_Mask_'+str(i)))
+        j += test_widths[i]
 
 
     # Plot SSIM with anomalies in red and normal in green
-    normal_ssim = []
-    anomalies_ssim = []
-    for i in range(number_of_patches):
-        if defective[i]:
-            anomalies_ssim.append(test_ssim[i])
-        else:
-            normal_ssim.append(test_ssim[i])
-    random.shuffle(normal_ssim)
-    normal_ssim = normal_ssim[0:anomalies_number]
-    fig = plt.figure()
-    plt.xlim([-1, 1])
-    fig.suptitle('SSIM with anomalies', fontsize=20)
-    plt.hist(normal_ssim, color='green', alpha=0.5, label='Normal')
-    plt.hist(anomalies_ssim, color='red', alpha=0.5, label='Anomalies')
-    plt.legend(loc='upper left')
-    fig.savefig(b.assemble_pathname('SSIM_Test with anomalies'))
-    plt.close('all')
-    # b.KDE(normal_ssim)
+    # normal_ssim = []
+    # anomalies_ssim = []
+    # for i in range(number_of_patches):
+    #     if defective[i]:
+    #         anomalies_ssim.append(test_ssim[i])
+    #     else:
+    #         normal_ssim.append(test_ssim[i])
+    # random.shuffle(normal_ssim)
+    # normal_ssim = normal_ssim[0:anomalies_number]
+    # fig = plt.figure()
+    # plt.xlim([-1, 1])
+    # fig.suptitle('SSIM with anomalies', fontsize=20)
+    # plt.hist(normal_ssim, color='green', alpha=0.5, label='Normal')
+    # plt.hist(anomalies_ssim, color='red', alpha=0.5, label='Anomalies')
+    # plt.legend(loc='upper left')
+    # fig.savefig(b.assemble_pathname('SSIM_Test with anomalies'))
+    # plt.close('all')
+    # # b.KDE(normal_ssim)
     b.myPrint('...end computing SSIM.', info_file)
     
     
@@ -161,18 +165,19 @@ def main(info_file):
 
     if allFigures:
         b.myPrint('Start computing t-SNE...', info_file)
-        b.compute_tsne(test_gmm, test_gmm_labels, 'test_tsne', gmm_torch)
+        b.compute_tsne(test_gmm[:test_widths[0]], test_gmm_labels[:test_widths[0]], 'test_tsne_0', gmm_torch)
         b.myPrint('...end computing t-SNE.', info_file)
     
     if show_reconstructed:
-        tensor_reconstructed = b.AssemblePatches(test_x_hat, len(test_dataset), channels, original_height, original_width, patch_size, stride)
-    
         b.myPrint('Start saving all reconstructed images...', info_file)
+        j = 0
         for i in range(len(test_dataset)):
+            tensor_reconstructed = b.AssemblePatches(test_x_hat[j:j+test_widths[i]], 1, channels, original_height, test_widths[i], patch_size, stride)
             torchvision.utils.save_image(test_dataset.__getitem__(i)[0], b.assemble_pathname('Test_image'+str(i)+'original'))
-            torchvision.utils.save_image(tensor_reconstructed.__getitem__(i), b.assemble_pathname('Test_image'+str(i)+'reconstructed'))
+            torchvision.utils.save_image(tensor_reconstructed.__getitem__(0), b.assemble_pathname('Test_image'+str(i)+'reconstructed'))
+            j += test_widths[i]
     
-    # test_scores = np.asarray(gmm.score_samples(test_gmm))
+    test_scores = np.asarray(gmm.score_samples(test_gmm))
     
     # p_max = np.max(test_scores)
     # p_min = np.min(test_scores)

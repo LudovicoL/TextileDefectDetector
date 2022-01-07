@@ -1,16 +1,16 @@
 import torch
 import torch.nn.functional as F
 import torchvision
-from config import allprint, ANOMALY_THRESHOLD
+from config import ANOMALY_THRESHOLD
 import backbone as b
 
-def DivideInPatches(dataset, original_height, original_width, n_channels, size, stride, masks=False):
+def DivideInPatches(dataset, n_channels, size, stride, masks=False):
     if not masks:
         patches = []
         for i in dataset:
             if i.shape[0] > 1:  # if the channels are greather than 1
                 temp = i.unfold(1, size, stride).unfold(2, size, stride)
-                patches.append(temp[0].reshape((1, int(original_height / size), int(original_width / size), size, size)).reshape((-1, n_channels, size, size)))
+                patches.append(temp[0].reshape((1, int(i.shape[1] / size), int(i.shape[2] / size), size, size)).reshape((-1, n_channels, size, size)))
             else:
                 patches.append(i.unfold(1, size, stride).unfold(2, size, stride).reshape((-1, n_channels, size, size)))
         return patches
@@ -20,9 +20,9 @@ def DivideInPatches(dataset, original_height, original_width, n_channels, size, 
         for i in dataset:
             if i[0].shape[0] > 1:  # if the channels are greather than 1
                 temp = i[0].unfold(1, size, stride).unfold(2, size, stride)
-                patches.append(temp[0].reshape((1, int(original_height / size), int(original_width / size), size, size)).reshape((-1, n_channels, size, size)))
+                patches.append(temp[0].reshape((1, int(i[0].shape[1] / size), int(i[0].shape[2] / size), size, size)).reshape((-1, n_channels, size, size)))
                 temp = i[1].unfold(1, size, stride).unfold(2, size, stride)
-                mask_patches.append(temp[0].reshape((1, int(original_height / size), int(original_width / size), size, size)).reshape((-1, n_channels, size, size)))
+                mask_patches.append(temp[0].reshape((1, int(i[1].shape[1] / size), int(i[1].shape[2] / size), size, size)).reshape((-1, n_channels, size, size)))
             else:
                 patches.append(i[0].unfold(1, size, stride).unfold(2, size, stride).reshape((-1, n_channels, size, size)))
                 mask_patches.append(i[1].unfold(1, size, stride).unfold(2, size, stride).reshape((-1, n_channels, size, size)))
@@ -36,7 +36,6 @@ def AssemblePatches(patches_tensor, number_of_images, channel, height, width, pa
     # print(temp.shape) # [number_of_images, C, patch_size*patch_size, number_patches_all]
     temp = temp.contiguous().view(number_of_images, channel*patch_size*patch_size, -1)
     # print(temp.shape) # [number_of_images, C*prod(kernel_size), L] as expected by Fold
-
     output = F.fold(temp, output_size=(height, width), kernel_size=patch_size, stride=stride)
     # print(output.shape) # [number_of_images, C, H, W]
     return output
