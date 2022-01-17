@@ -18,15 +18,17 @@ allFigures = True
 Telegram_messages = True
 seed = 0
 
-TYPE_OF_TEXTILE = '06/'
+TYPE_OF_TEXTILE = '03/'
 
 ########################################################
 # Datasets
 # AITEX
-train_dir = './dataset/AITEX/trainset/' + TYPE_OF_TEXTILE
-validation_dir = './dataset/AITEX/validationset/' + TYPE_OF_TEXTILE
-test_dir = './dataset/AITEX/testset/' + TYPE_OF_TEXTILE
-mask_dir = './dataset/AITEX/Mask_images'
+aitex_folder = './dataset/AITEX'
+aitex_train_dir = aitex_folder + '/trainset/'
+aitex_validation_dir = aitex_folder + '/validationset/'
+aitex_test_dir = aitex_folder + '/testset/'
+aitex_mask_dir = aitex_folder + '/Mask_images/'
+CUT_PATCHES = 6
 
 ########################################################
 # Network parameters
@@ -43,7 +45,7 @@ learning_rate = 1e-4
 ANOMALY_THRESHOLD = 2
 
 BIC_MAX_RANGE = 100
-GMM_N_COMPONENTS = 98
+GMM_N_COMPONENTS = 2 #98
 GMM_COVARIANCE = 'full'
 
 ########################################################

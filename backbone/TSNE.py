@@ -1,6 +1,5 @@
 from sklearn.manifold import TSNE
 from matplotlib import pyplot as plt
-import numpy as np
 import torch
 
 import backbone as b
@@ -17,6 +16,6 @@ def compute_tsne(X, label, name, tensors):
     outputs_dir = Config().getOutputDir()
     torch.save(tsne_result, outputs_dir + name + '.pt')
     fig = plt.figure()
-    plt.scatter(tsne_result[:, 0], tsne_result[:, 1], 20, label)
+    plt.scatter(x=tsne_result[:, 0], y=tsne_result[:, 1], s=20, c=label, cmap='Set1')
     fig.savefig(b.assemble_pathname(name))
     plt.close('all')

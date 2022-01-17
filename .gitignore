@@ -1,7 +1,9 @@
 .git/
+.vscode/
 .idea/
 dataset/
 outputs/
 __pycache__/
 assets/
 *.ll
+

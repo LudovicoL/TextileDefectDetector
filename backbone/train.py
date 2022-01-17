@@ -1,8 +1,6 @@
 import torch
 from tqdm import tqdm
 import backbone as b
-
-
 from config import *
 
 def train(model, epochs, device, train_loader, validation_loader):
@@ -62,7 +60,7 @@ def train(model, epochs, device, train_loader, validation_loader):
                 b.display_images(x, x_hat, epoch, b.assemble_pathname('Validation_phase' + str(epoch)), True)
             
             b.myPrint(f'====> Epoch: {epoch} Train set average loss: {training_loss:.4f}', info_file)
-            b.myPrint(f'====> Validation set average loss: {validation_loss:.4f}', info_file)
+            b.myPrint(f'\tValidation set average loss: {validation_loss:.4f}', info_file)
     
     return train_x_hat, validation_x_hat, train_features, validation_features
     
