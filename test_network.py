@@ -10,7 +10,6 @@ import argparse
 import os
 import sys
 import pickle
-import cv2 as cv
 
 import backbone as b
 from config import *
@@ -58,6 +57,9 @@ def main(info_file):
     random.seed(seed)
 
     if dataset == "aitex":
+        if not (os.path.isdir(aitex_train_dir) and os.path.isdir(aitex_validation_dir) and os.path.isdir(aitex_test_dir) and os.path.isdir(aitex_mask_dir)):
+            b.myPrint("ERROR: Run \'train_network.py\' firstly!", info_file)
+            sys.exit(-1)
         test_dataset = b.AitexDataSet(aitex_test_dir, masks=True)
         channels = test_dataset[0][0].shape[0]
         original_height = test_dataset[0][0].shape[1]

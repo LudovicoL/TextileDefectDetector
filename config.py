@@ -14,7 +14,7 @@ debugging_mode = True
 
 plot_extension = '.png'
 allprint = False
-allFigures = True
+allFigures = False
 Telegram_messages = True
 seed = 0
 
@@ -33,6 +33,8 @@ CUT_PATCHES = 6
 ########################################################
 # Network parameters
 
+EPOCHS = 200
+
 latent_space = 25
 
 patch_size = 16
@@ -42,7 +44,7 @@ batch_size = 256
 
 learning_rate = 1e-4
 
-ANOMALY_THRESHOLD = 2
+ANOMALY_THRESHOLD = 2       # Ignore patches that have less than ANOMALY_THRESHOLD+1 white pixels
 
 BIC_MAX_RANGE = 100
 GMM_N_COMPONENTS = 2 #98

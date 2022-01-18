@@ -8,24 +8,20 @@ def DivideInPatches(dataset, n_channels, size, stride, masks=False):
     if not masks:
         patches = []
         for i in dataset:
-            if i.shape[0] > 1:  # if the channels are greather than 1
-                temp = i.unfold(1, size, stride).unfold(2, size, stride)
-                patches.append(temp[0].reshape((1, int(i.shape[1] / size), int(i.shape[2] / size), size, size)).reshape((-1, n_channels, size, size)))
-            else:
-                patches.append(i.unfold(1, size, stride).unfold(2, size, stride).reshape((-1, n_channels, size, size)))
+            p = i.unfold(1, size, stride).unfold(2, size, stride)
+            p = p.contiguous().view(p.size(0), -1, size, size).permute(1,0,2,3)
+            patches.append(p)
         return patches
     else:
         patches = []
         mask_patches = []
         for i in dataset:
-            if i[0].shape[0] > 1:  # if the channels are greather than 1
-                temp = i[0].unfold(1, size, stride).unfold(2, size, stride)
-                patches.append(temp[0].reshape((1, int(i[0].shape[1] / size), int(i[0].shape[2] / size), size, size)).reshape((-1, n_channels, size, size)))
-                temp = i[1].unfold(1, size, stride).unfold(2, size, stride)
-                mask_patches.append(temp[0].reshape((1, int(i[1].shape[1] / size), int(i[1].shape[2] / size), size, size)).reshape((-1, n_channels, size, size)))
-            else:
-                patches.append(i[0].unfold(1, size, stride).unfold(2, size, stride).reshape((-1, n_channels, size, size)))
-                mask_patches.append(i[1].unfold(1, size, stride).unfold(2, size, stride).reshape((-1, n_channels, size, size)))
+            p = i[0].unfold(1, size, stride).unfold(2, size, stride)
+            p = p.contiguous().view(p.size(0), -1, size, size).permute(1,0,2,3)
+            patches.append(p)
+            m = i[1].unfold(1, size, stride).unfold(2, size, stride)
+            m = p.contiguous().view(m.size(0), -1, size, size).permute(1,0,2,3)
+            mask_patches.append(m)
         return patches, mask_patches
 
 

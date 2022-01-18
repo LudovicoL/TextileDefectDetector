@@ -1,5 +1,5 @@
 from .patches import DivideInPatches, AssemblePatches, getPosition, countAnomalies
-from .VAE import VariationalAutoencoder#, add_noise
+from .VAE import VariationalAutoencoder
 from .DisplayImages import display_images, plot_couple, assemble_pathname
 from .train import train
 from .test import test
@@ -10,7 +10,6 @@ from .KDE import *
 from .metrics import *
 from .AITEX import AitexDataSet, augmentationDataset, resize, checkAitex
 
-from config import Telegram_messages
 
 import requests
 import json
@@ -34,8 +33,13 @@ def telegram_bot_sendtext(bot_message):
     "idchat": ""    <-- your chat id
     }
     """
-    with open('./tg.ll') as f:
-        data = json.load(f)
+    try:
+        with open('./tg.ll') as f:
+            data = json.load(f)
+    except:
+        info_file = Config().getInfoFile()
+        b.myPrint("ERROR: Can't send message on Telegram. Configure the \'./tg.ll\' file or set Telegram_messages=False.", info_file)
+        return
     bot_token = data['token']
     bot_chatID = data['idchat']
     send_text = 'https://api.telegram.org/bot' + bot_token + '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + bot_message
@@ -155,3 +159,12 @@ def AnomalyProbabilityMap(scores, fs, ssim_masks):
             j += 0.1
         fp.append(torch.div(np.add(np.multiply(ssim_masks[i], alpha), np.multiply(fs[i], beta)), max))
     return fp
+
+
+def add_noise(inputs, noise_factor=0.3):
+    """
+    source: https://ichi.pro/it/denoising-autoencoder-in-pytorch-sul-set-di-dati-mnist-184080287458686
+    """
+    noisy = inputs + torch.randn_like(inputs) * noise_factor
+    noisy = torch.clip(noisy, 0., 1.)
+    return noisy

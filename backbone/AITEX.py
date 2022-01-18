@@ -18,9 +18,6 @@ transform = transforms.Compose([
     transforms.ToTensor()
 ])
 
-transform_masks = transforms.Compose([
-    transforms.ToTensor()
-])
 
 class AitexDataSet(Dataset):
     def __init__(self, main_dir, masks=False):
@@ -44,7 +41,7 @@ class AitexDataSet(Dataset):
             if os.path.isfile(self.mask_dir + '/' + mask_name):
                 mask_loc = os.path.join(self.mask_dir, mask_name)
                 mask = Image.open(mask_loc).convert('L')
-                tensor_mask = transform_masks(mask)
+                tensor_mask = transform(mask)
                 return tensor_image, tensor_mask
         else:
             return tensor_image
@@ -64,6 +61,10 @@ def augmentationDataset(dataset):
 
         ds.append(j)                                                    # Original image
         widths.append(j.shape[2])
+
+        noised_image = b.add_noise(j, noise_factor=0.05)                # Gaussian noise
+        ds.append(noised_image)
+        widths.append(noised_image.shape[2])
 
         j = np.transpose(j.numpy(), (1, 2, 0))
         ds.append(torch.tensor(np.fliplr(j).copy()).permute(2, 0, 1))   # orizontal flip
@@ -243,9 +244,8 @@ def CreateAitexDataset(AitexFolder):
 
 def checkAitex():
     if os.path.isdir(aitex_folder):
-        if (os.path.isdir(aitex_train_dir) and os.path.isdir(aitex_validation_dir) and os.path.isdir(aitex_test_dir)):
-            print("Dataset ok")
-            return True
+        if (os.path.isdir(aitex_train_dir) and os.path.isdir(aitex_validation_dir) and os.path.isdir(aitex_test_dir) and os.path.isdir(aitex_mask_dir)):
+            return
         else:
             info_file = Config().getInfoFile()
             b.myPrint("Preparing the AITEX dataset...", info_file)

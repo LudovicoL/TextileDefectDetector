@@ -16,7 +16,7 @@ from config import *
 ## Argparse declaration ##
 ap = argparse.ArgumentParser()
 ap.add_argument("-ls", "--load_state", action="store_true", help="Load last trained model.")
-ap.add_argument("-e", "--epochs", required=False, default=200, help="Number of epochs.")
+ap.add_argument("-e", "--epochs", required=False, default=EPOCHS, help="Number of epochs.")
 ap.add_argument("-gt", "--gmm", action="store_true", help="True to use pytorch implementation, False to use sklearn library.")
 ap.add_argument("--bic", action="store_true", help="True to calculate BIC.")
 ap.add_argument("-sr", "--sr", action="store_true", help="True to save all reconstructed images.")
@@ -71,7 +71,7 @@ def main(info_file):
         validation_dataset, validation_widths = b.resize(validation_dataset, original_width, original_height)
         train_dataset, train_widths = b.augmentationDataset(train_dataset)
 
-    b.myPrint('Dataset:' + dataset + '\nBatch size: ' + str(batch_size) + "\nEpochs: " + str(epochs) + '\nLatent space: ' + str(latent_space) + '\nPatches size: ' + str(patch_size), info_file)
+    b.myPrint('Dataset: ' + dataset + '\nBatch size: ' + str(batch_size) + "\nEpochs: " + str(epochs) + '\nLatent space: ' + str(latent_space) + '\nPatches size: ' + str(patch_size), info_file)
 
     b.myPrint('There are ' + str(len(train_dataset)) + ' train images with size [W]' + str(original_width) + ' × [H]' + str(original_height) + ' × [C]' + str(channels), info_file)
     b.myPrint('There are ' + str(len(validation_dataset)) + ' validation images with size [W]' + str(original_width) + ' × [H]' + str(original_height) + ' × [C]' + str(channels), info_file)

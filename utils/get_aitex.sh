@@ -20,5 +20,4 @@ rm Defect_images.7z
 rm NODefect_images.7z
 rm Mask_images.7z
 echo Archives deleted successfully.
-cd ../../utils
-python CreateDataset.py
+cd ../../
