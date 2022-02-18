@@ -12,6 +12,7 @@ import sys
 import pickle
 
 import backbone as b
+from backbone.test import test
 from config import *
 #############################################################
 ## Argparse declaration ##
@@ -64,12 +65,18 @@ def main(info_file):
         channels = test_dataset[0][0].shape[0]
         original_height = test_dataset[0][0].shape[1]
         original_width = test_dataset[0][0].shape[2]
-        test_dataset, test_widths = b.resize(test_dataset, original_width, original_height, True)
-
-    b.myPrint('There are ' + str(len(test_dataset)) + ' test images with size [W]' + str(original_width) + ' × [H]' + str(original_height) + ' × [C]' + str(channels), info_file)
+        test_dataset, test_widths, test_heights = b.resizeAitex(test_dataset, original_width, original_height, True)
+        test_number_of_patches_for_image = b.calculateNumberPatches(test_widths, test_heights, patch_size)
+        b.myPrint('There are ' + str(len(test_dataset)) + ' test images with size [W]' + str(original_width) + ' × [H]' + str(original_height) + ' × [C]' + str(channels), info_file)
+    if dataset == "new":
+        test_dataset = b.NewDataSet(newdataset_test_dir, masks=True)
+        channels = test_dataset[0][0].shape[0]
+        test_dataset, test_widths, test_heights = b.resizeNewDataset(test_dataset, True)
+        test_number_of_patches_for_image = b.calculateNumberPatches(test_widths, test_heights, patch_size)
+        b.myPrint('There are ' + str(len(test_dataset)) + ' test images.', info_file)
     number_of_original_images = len(test_dataset)
 
-    test_patches, mask_test_patches = b.DivideInPatches(test_dataset, channels, patch_size, stride, True)
+    test_patches, mask_test_patches = b.DivideInPatches(test_dataset, patch_size, stride, True)
     
 
     test_patches = torch.cat(test_patches, dim=0).reshape(-1, channels, patch_size, patch_size)
@@ -85,7 +92,7 @@ def main(info_file):
     
     test_loader = DataLoader(test_patches, batch_size=batch_size)
 
-    model = b.VariationalAutoencoder(latent_space, learning_rate, channels).to(device)
+    model = b.VariationalAutoencoder(latent_space, learning_rate, channels, patch_size).to(device)
     model.load_state_dict(torch.load(outputs_dir + 'vae_state_dict.pt'))
     
     test_x_hat, test_features = b.test(model, device, test_loader)
@@ -106,7 +113,7 @@ def main(info_file):
         test_ssim_masks.append(diff)
     torch.save(test_ssim, outputs_dir + 'test_ssim.pt')
     torch.save(test_ssim_masks, outputs_dir + 'test_ssim_masks.pt')
-    test_ssim_masks_tensor = torch.Tensor(test_ssim_masks).unsqueeze(3).permute(0, 3, 1, 2)
+    test_ssim_masks_tensor = torch.Tensor(test_ssim_masks).permute(0, 3, 1, 2)
     b.plot_ssim_histogram(test_ssim, b.assemble_pathname('SSIM_Test'), 'SSIM for testset')      # Plot test SSIM histogram
     
     
@@ -114,12 +121,13 @@ def main(info_file):
     max_intensity = torch.load(outputs_dir + 'max_intensity.pt')
     j = 0
     for i in range(number_of_original_images):
-        tensor_reconstructed = b.AssemblePatches(test_ssim_masks_tensor[j:j+test_widths[i]], 1, channels, original_height, test_widths[i], patch_size, stride).__getitem__(0)
-        tensor_reconstructed[tensor_reconstructed < max_intensity] = 0
+        tensor_reconstructed = b.AssemblePatches(test_ssim_masks_tensor[j:j+test_number_of_patches_for_image[i]], 1, channels, test_heights[i], test_widths[i], patch_size, stride).__getitem__(0)
+        # tensor_reconstructed[tensor_reconstructed < max_intensity] = 0
         # otsu = b.OtsuThreshold(tensor_reconstructed[0].cpu().detach().numpy())
         # tensor_reconstructed = b.binarize(tensor_reconstructed, threshold=otsu)#.type(torch.FloatTensor)
+        tensor_reconstructed = b.binarize(tensor_reconstructed)
         torchvision.utils.save_image(tensor_reconstructed, b.assemble_pathname('SSIM_Mask_'+str(i)))
-        j += test_widths[i]
+        j += test_number_of_patches_for_image[i]
 
 
     # Plot SSIM with anomalies in red and normal in green
@@ -174,28 +182,28 @@ def main(info_file):
 
     if allFigures:
         b.myPrint('Start computing t-SNE...', info_file)
-        b.compute_tsne(test_gmm[test_widths[0]:test_widths[0]+test_widths[1]], test_gmm_labels[test_widths[0]:test_widths[0]+test_widths[1]], 'test_tsne', gmm_torch)
+        b.compute_tsne(test_gmm[test_number_of_patches_for_image[0]:test_number_of_patches_for_image[0]+test_number_of_patches_for_image[1]], test_gmm_labels[test_number_of_patches_for_image[0]:test_number_of_patches_for_image[0]+test_number_of_patches_for_image[1]], 'test_tsne', gmm_torch)
         b.myPrint('...end computing t-SNE.', info_file)
     
     if show_reconstructed:
         b.myPrint('Start saving all reconstructed images...', info_file)
         j = 0
         for i in range(number_of_original_images):
-            tensor_reconstructed = b.AssemblePatches(test_x_hat[j:j+test_widths[i]], 1, channels, original_height, test_widths[i], patch_size, stride).__getitem__(0)
+            tensor_reconstructed = b.AssemblePatches(test_x_hat[j:j+test_number_of_patches_for_image[i]], 1, channels, test_heights[i], test_widths[i], patch_size, stride).__getitem__(0)
             torchvision.utils.save_image(test_dataset.__getitem__(i)[0], b.assemble_pathname('Test_image'+str(i)+'original'))
             torchvision.utils.save_image(tensor_reconstructed, b.assemble_pathname('Test_image'+str(i)+'reconstructed'))
-            j += test_widths[i]
+            j += test_number_of_patches_for_image[i]
       
         
     test_scores = np.asarray(gmm.score_samples(test_gmm))
 
     fs = b.ScoreMap(test_scores)        # Score map
     
-    j = 0
-    for i in range(number_of_original_images):
-        tensor_reconstructed = b.AssemblePatches(fs[j:j+test_widths[i]], 1, channels, original_height, test_widths[i], patch_size, stride).__getitem__(0)
-        torchvision.utils.save_image(tensor_reconstructed, b.assemble_pathname('FS_'+str(i)))
-        j += test_widths[i]
+    # j = 0
+    # for i in range(number_of_original_images):
+    #     tensor_reconstructed = b.AssemblePatches(fs[j:j+test_number_of_patches_for_image[i]], 1, channels, test_heights[i], test_widths[i], patch_size, stride).__getitem__(0)
+    #     torchvision.utils.save_image(tensor_reconstructed, b.assemble_pathname('FS_'+str(i)))
+    #     j += test_number_of_patches_for_image[i]
 
     
     fp = b.AnomalyProbabilityMap(test_scores, fs, test_ssim_masks)
@@ -203,18 +211,18 @@ def main(info_file):
     segmantion_map_threshold = torch.load(outputs_dir + 'segmantion_map_threshold.pt')
     print('Threshold: ' + str(segmantion_map_threshold))
     
-    S = []
+    # S = []
 
-    for k in fp:
-        for i in range(patch_size):
-            for j in range(patch_size):
-                if k[i][j] >= segmantion_map_threshold:
-                    S.append(1)
-                else:
-                    S.append(0)
-    S = np.asarray(S).reshape(-1, patch_size, patch_size)
+    # for k in fp:
+    #     for i in range(patch_size):
+    #         for j in range(patch_size):
+    #             if k[i][j] >= segmantion_map_threshold:
+    #                 S.append(1)
+    #             else:
+    #                 S.append(0)
+    # S = np.asarray(S).reshape(-1, patch_size, patch_size)
     
-    np.savetxt(outputs_dir + 'S.txt', S.reshape(-1, 256))
+    # np.savetxt(outputs_dir + 'S.txt', S.reshape(-1, 256))
 
     Normal = []
     Anomalies = []
@@ -229,7 +237,7 @@ def main(info_file):
         # if difference < THRESHOLD:
         # if test_ssim[i] < 0.75:
         # if scores[i] <= thresh:
-        if np.sum(S[i]) > 0:
+        if np.sum(test_ssim_masks[i]) > 0:
             Anomalies.append(i)
             if int(torch.sum(mask_test_patches[i])) > 0:
                 TP.append(i)

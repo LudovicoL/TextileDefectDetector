@@ -4,9 +4,9 @@ from matplotlib import pyplot as plt
 
 def calculate_ssim(img1, img2, tensors=True):
     if tensors:
-        img1 = img1.permute(1,2,0).cpu().detach().numpy().squeeze(2)
-        img2 = img2.permute(1,2,0).cpu().detach().numpy().squeeze(2)
-    score, diff = ssim(img1, img2, full=True)
+        img1 = img1.permute(1,2,0).cpu().detach().numpy()#.squeeze(2)
+        img2 = img2.permute(1,2,0).cpu().detach().numpy()#.squeeze(2)
+    score, diff = ssim(img1, img2, full=True, multichannel=True)
     diff = 1 - diff
     return score, diff
 

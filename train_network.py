@@ -60,6 +60,8 @@ def main(info_file):
     random.seed(seed)
     
 
+    b.myPrint('Dataset: ' + dataset + '\nBatch size: ' + str(batch_size) + "\nEpochs: " + str(epochs) + '\nLatent space: ' + str(latent_space) + '\nPatches size: ' + str(patch_size), info_file)
+
     if dataset == "aitex":
         b.checkAitex()
         train_dataset = b.AitexDataSet(aitex_train_dir)
@@ -67,17 +69,28 @@ def main(info_file):
         channels = train_dataset[0].shape[0]
         original_height = train_dataset[0].shape[1]
         original_width = train_dataset[0].shape[2]
-        train_dataset, train_widths = b.resize(train_dataset, original_width, original_height)
-        validation_dataset, validation_widths = b.resize(validation_dataset, original_width, original_height)
-        train_dataset, train_widths = b.augmentationDataset(train_dataset)
+        train_dataset, train_widths, train_heights = b.resizeAitex(train_dataset, original_width, original_height)
+        validation_dataset, validation_widths, validation_heights = b.resizeAitex(validation_dataset, original_width, original_height)
+        train_dataset, train_widths, train_heights = b.augmentationDataset(train_dataset)
+        train_number_of_patches_for_image = b.calculateNumberPatches(train_widths, train_heights, patch_size)
+        validation_number_of_patches_for_image = b.calculateNumberPatches(validation_widths, validation_heights, patch_size)
+        b.myPrint('There are ' + str(len(train_dataset)) + ' train images with size [W]' + str(original_width) + ' × [H]' + str(original_height) + ' × [C]' + str(channels), info_file)
+        b.myPrint('There are ' + str(len(validation_dataset)) + ' validation images with size [W]' + str(original_width) + ' × [H]' + str(original_height) + ' × [C]' + str(channels), info_file)
+    if dataset == "new":
+        b.checkNewDataset()
+        train_dataset = b.NewDataSet(newdataset_train_dir)
+        validation_dataset = b.NewDataSet(newdataset_validation_dir)
+        channels = train_dataset[0].shape[0]
+        train_dataset, train_widths, train_heights = b.resizeNewDataset(train_dataset)
+        validation_dataset, validation_widths, validation_heights = b.resizeNewDataset(validation_dataset)
+        train_number_of_patches_for_image = b.calculateNumberPatches(train_widths, train_heights, patch_size)
+        validation_number_of_patches_for_image = b.calculateNumberPatches(validation_widths, validation_heights, patch_size)
+        b.myPrint('There are ' + str(len(train_dataset)) + ' train images.', info_file)
+        b.myPrint('There are ' + str(len(validation_dataset)) + ' validation images.', info_file)
 
-    b.myPrint('Dataset: ' + dataset + '\nBatch size: ' + str(batch_size) + "\nEpochs: " + str(epochs) + '\nLatent space: ' + str(latent_space) + '\nPatches size: ' + str(patch_size), info_file)
 
-    b.myPrint('There are ' + str(len(train_dataset)) + ' train images with size [W]' + str(original_width) + ' × [H]' + str(original_height) + ' × [C]' + str(channels), info_file)
-    b.myPrint('There are ' + str(len(validation_dataset)) + ' validation images with size [W]' + str(original_width) + ' × [H]' + str(original_height) + ' × [C]' + str(channels), info_file)
-
-    train_patches = b.DivideInPatches(train_dataset, channels, patch_size, stride)
-    validation_patches = b.DivideInPatches(validation_dataset, channels, patch_size, stride)
+    train_patches = b.DivideInPatches(train_dataset, patch_size, stride)
+    validation_patches = b.DivideInPatches(validation_dataset, patch_size, stride)
 
     train_patches = torch.cat(train_patches, dim=0).reshape(-1, channels, patch_size, patch_size)
     validation_patches = torch.cat(validation_patches, dim=0).reshape(-1, channels, patch_size, patch_size)
@@ -89,9 +102,9 @@ def main(info_file):
     validation_loader = DataLoader(validation_patches , batch_size=batch_size, shuffle=False)
     
     if not load_state:
-        model = b.VariationalAutoencoder(latent_space, learning_rate, channels).to(device)
+        model = b.VariationalAutoencoder(latent_space, learning_rate, channels, patch_size).to(device)
         train_x_hat, validation_x_hat, train_features, validation_features = b.train(model, epochs, device, train_loader, validation_loader)
-    
+
         train_x_hat = torch.cat(train_x_hat, dim=0).reshape(-1, channels, patch_size, patch_size)
         validation_x_hat = torch.cat(validation_x_hat, dim=0).reshape(-1, channels, patch_size, patch_size)
         train_features = torch.cat(train_features, dim=0)
@@ -101,11 +114,11 @@ def main(info_file):
         torch.save(validation_x_hat, outputs_dir + 'validation_x_hat.pt')
         torch.save(train_features, outputs_dir + 'train_features.pt')
         torch.save(validation_features, outputs_dir + 'validation_features.pt')
-        tensor_reconstructed = b.AssemblePatches(validation_x_hat[:validation_widths[0]], 1, channels, original_height, validation_widths[0], patch_size, stride)
+        tensor_reconstructed = b.AssemblePatches(validation_x_hat[:validation_number_of_patches_for_image[0]], 1, channels, validation_heights[0], validation_widths[0], patch_size, stride)
         torchvision.utils.save_image(tensor_reconstructed.__getitem__(0), b.assemble_pathname('Validation_dataset_image0_reconstructed'))
     else:
         # To avoid train phase:
-        model = b.VariationalAutoencoder(latent_space, learning_rate, channels).to(device)
+        model = b.VariationalAutoencoder(latent_space, learning_rate, channels, patch_size).to(device)
         model.load_state_dict(torch.load(outputs_dir + 'vae_state_dict.pt'))
         train_x_hat = torch.load(outputs_dir + 'train_x_hat.pt')
         validation_x_hat = torch.load(outputs_dir + 'validation_x_hat.pt')
@@ -115,10 +128,10 @@ def main(info_file):
         b.myPrint('Start saving all reconstructed images...', info_file)
         j = 0
         for i in range(len(train_dataset)):
-            tensor_reconstructed = b.AssemblePatches(train_x_hat[j:j+train_widths[i]], 1, channels, original_height, train_widths[i], patch_size, stride).__getitem__(0)
+            tensor_reconstructed = b.AssemblePatches(train_x_hat[j:j+train_number_of_patches_for_image[i]], 1, channels, train_heights[i], train_widths[i], patch_size, stride).__getitem__(0)
             torchvision.utils.save_image(train_dataset.__getitem__(i)[0], b.assemble_pathname('Train_image'+str(i)+'original'))
             torchvision.utils.save_image(tensor_reconstructed, b.assemble_pathname('Train_image'+str(i)+'reconstructed'))
-            j += train_widths[i]
+            j += train_number_of_patches_for_image[i]
     
     
     b.myPrint('Start computing SSIM for trainset...', info_file)
@@ -131,7 +144,7 @@ def main(info_file):
         train_ssim_diff.append(diff)
     torch.save(train_ssim, outputs_dir + 'train_ssim.pt')
     torch.save(train_ssim_diff, outputs_dir + 'train_ssim_diff.pt')
-    train_ssim_diff_tensor = torch.Tensor(train_ssim_diff).unsqueeze(3).permute(0, 3, 1, 2)
+    train_ssim_diff_tensor = torch.Tensor(train_ssim_diff).permute(0, 3, 1, 2)
     b.plot_ssim_histogram(train_ssim, b.assemble_pathname('SSIM_Train'), 'SSIM for trainset')           # Plot train SSIM histogram
     b.myPrint('...start computing SSIM for validationset...', info_file)
     
@@ -150,10 +163,10 @@ def main(info_file):
     j = 0
     max_intensity = np.zeros(len(train_dataset))
     for i in range(len(train_dataset)):
-        tensor_reconstructed = b.AssemblePatches(train_ssim_diff_tensor[j:j+train_widths[i]], 1, channels, original_height, train_widths[i], patch_size, stride).__getitem__(0)
+        tensor_reconstructed = b.AssemblePatches(train_ssim_diff_tensor[j:j+train_number_of_patches_for_image[i]], 1, channels, train_heights[i], train_widths[i], patch_size, stride).__getitem__(0)
         # torchvision.utils.save_image(tensor_reconstructed, b.assemble_pathname('TRAIN_SSIM_Mask_'+str(i)))
         max_intensity[i] = torch.max(tensor_reconstructed).item()
-        j += train_widths[i]
+        j += train_number_of_patches_for_image[i]
     max_intensity = np.max(max_intensity)
     
     torch.save(max_intensity, outputs_dir + 'max_intensity.pt')
@@ -197,13 +210,6 @@ def main(info_file):
     '''
 
     fs = b.ScoreMap(validation_scores)        # Score map
-    
-    j = 0
-    for i in range(len(validation_dataset)):
-        tensor_reconstructed = b.AssemblePatches(fs[j:j+validation_widths[i]], 1, channels, original_height, validation_widths[i], patch_size, stride).__getitem__(0)
-        torchvision.utils.save_image(tensor_reconstructed, b.assemble_pathname('Validation_FS_'+str(i)))
-        j += validation_widths[i]
-
     
     fp = b.AnomalyProbabilityMap(validation_scores, fs, validation_ssim_masks)
     fp_max_values = []

@@ -1,4 +1,4 @@
-from .patches import DivideInPatches, AssemblePatches, getPosition, countAnomalies
+from .patches import DivideInPatches, AssemblePatches, getPosition, countAnomalies, calculateNumberPatches
 from .VAE import VariationalAutoencoder
 from .DisplayImages import display_images, plot_couple, assemble_pathname
 from .train import train
@@ -6,15 +6,16 @@ from .test import test
 from .SSIM import calculate_ssim, plot_ssim_histogram
 from .GMM import *
 from .TSNE import *
-from .KDE import *
 from .metrics import *
-from .AITEX import AitexDataSet, augmentationDataset, resize, checkAitex
+from .AITEX import AitexDataSet, resizeAitex, checkAitex
+from .NewDataset import *
 
 
 import requests
 import json
 import os
 import skimage.filters
+from scipy.ndimage.filters import gaussian_filter
 
 def myPrint(string, filename):
     print(string)
@@ -125,7 +126,6 @@ def WeightedHO():
     weightedHO[:, :] = 0.6
     weightedHO[int(patch_size/8) : int(7*patch_size/8), int(patch_size/8) : int(7*patch_size/8)] = 0.8
     weightedHO[int(patch_size/4) : int(3*patch_size/4), int(patch_size/4) : int(3*patch_size/4)] = 1
-    # print(weightedHO)
     return weightedHO
 
 def ScoreMap(scores):
@@ -168,3 +168,35 @@ def add_noise(inputs, noise_factor=0.3):
     noisy = inputs + torch.randn_like(inputs) * noise_factor
     noisy = torch.clip(noisy, 0., 1.)
     return noisy
+
+def augmentationDataset(dataset):
+    ds = []
+    widths = []
+    heights = []
+    for i in range(len(dataset)):
+        j = dataset.__getitem__(i)
+
+        ds.append(j)                                                    # Original image
+        widths.append(j.shape[2])
+        heights.append(j.shape[1])
+
+        noised_image = b.add_noise(j, noise_factor=0.05)                # Gaussian noise
+        ds.append(noised_image)
+        widths.append(noised_image.shape[2])
+        heights.append(noised_image.shape[1])
+
+        j = np.transpose(j.numpy(), (1, 2, 0))
+        ds.append(torch.tensor(np.fliplr(j).copy()).permute(2, 0, 1))   # orizontal flip
+        widths.append(j.shape[1])
+        heights.append(j.shape[0])
+
+        ds.append(torch.tensor(np.flipud(j).copy()).permute(2, 0, 1))   # vertical flip
+        widths.append(j.shape[1])
+        heights.append(j.shape[0])
+
+        blurred = gaussian_filter(j, sigma=0.5)                         # blur
+        ds.append(torch.tensor(blurred).permute(2, 0, 1))
+        widths.append(j.shape[1])
+        heights.append(j.shape[0])
+        
+    return ds, widths, heights

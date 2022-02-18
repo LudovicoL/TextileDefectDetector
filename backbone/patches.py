@@ -4,7 +4,7 @@ import torchvision
 from config import ANOMALY_THRESHOLD
 import backbone as b
 
-def DivideInPatches(dataset, n_channels, size, stride, masks=False):
+def DivideInPatches(dataset, size, stride, masks=False):
     if not masks:
         patches = []
         for i in dataset:
@@ -26,7 +26,7 @@ def DivideInPatches(dataset, n_channels, size, stride, masks=False):
 
 
 def AssemblePatches(patches_tensor, number_of_images, channel, height, width, patch_size, stride):
-    temp = patches_tensor.contiguous().view(number_of_images, channel, -1, patch_size*patch_size)
+    temp = patches_tensor.contiguous().transpose(1,0).view(number_of_images, channel, -1, patch_size*patch_size).transpose(0,1)
     # print(temp.shape) # [number_of_images, C, number_patches_all, patch_size*patch_size]
     temp = temp.permute(0, 1, 3, 2) 
     # print(temp.shape) # [number_of_images, C, patch_size*patch_size, number_patches_all]
@@ -57,3 +57,10 @@ def countAnomalies(mask_test_patches, save=False):
         else:
             defective.append(False)
     return number_of_defects, defective
+
+def calculateNumberPatches(widths, heights, patch_size):
+    number_of_patches = []
+    for i in range(len(widths)):
+        n = int((widths[i]*heights[i])/(patch_size*patch_size))
+        number_of_patches.append(n)
+    return number_of_patches

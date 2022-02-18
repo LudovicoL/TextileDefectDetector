@@ -24,11 +24,18 @@ TYPE_OF_TEXTILE = '03/'
 # Datasets
 # AITEX
 aitex_folder = './dataset/AITEX'
-aitex_train_dir = aitex_folder + '/trainset/'
-aitex_validation_dir = aitex_folder + '/validationset/'
-aitex_test_dir = aitex_folder + '/testset/'
+aitex_train_dir = aitex_folder + '/trainset/'+TYPE_OF_TEXTILE
+aitex_validation_dir = aitex_folder + '/validationset/'+TYPE_OF_TEXTILE
+aitex_test_dir = aitex_folder + '/testset/'+TYPE_OF_TEXTILE
 aitex_mask_dir = aitex_folder + '/Mask_images/'
 CUT_PATCHES = 6
+
+# NEW DATASET
+newdataset_folder = './dataset/new_dataset'
+newdataset_train_dir = newdataset_folder + '/trainset/'
+newdataset_validation_dir = newdataset_folder + '/validationset/'
+newdataset_test_dir = newdataset_folder + '/testset/'
+newdataset_mask_dir = newdataset_folder + '/Mask_images/'
 
 ########################################################
 # Network parameters
@@ -37,12 +44,14 @@ EPOCHS = 200
 
 latent_space = 25
 
-patch_size = 16
+patch_size = 32
 stride = patch_size
 
 batch_size = 256
 
 learning_rate = 1e-4
+
+MOMENTUM = 0.01
 
 ANOMALY_THRESHOLD = 2       # Ignore patches that have less than ANOMALY_THRESHOLD+1 white pixels
 

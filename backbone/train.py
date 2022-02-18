@@ -43,19 +43,19 @@ def train(model, epochs, device, train_loader, validation_loader):
             # Testing on validation set
             with torch.no_grad():
                 model.eval()
-                validation_loss = 0
+                val_loss = 0
                 loop = tqdm(validation_loader)
                 for x in loop:
                     x = x.to(device)
                     # ===================forward=====================
                     x_hat, mu, logvar, features = model(x)
-                    validation_loss += model.loss_function(x_hat, x, mu, logvar).item()
+                    val_loss += model.loss_function(x_hat, x, mu, logvar).item()
                     # =====================log=======================
                     if epoch == epochs:
                         validation_x_hat.append(x_hat)
                         validation_features.append(features)
             # ===================log========================
-            validation_loss = ( validation_loss * batch_size ) / len(validation_loader.dataset)
+            validation_loss = ( val_loss * batch_size ) / len(validation_loader.dataset)
             if allFigures:
                 b.display_images(x, x_hat, epoch, b.assemble_pathname('Validation_phase' + str(epoch)), True)
             

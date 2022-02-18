@@ -42,7 +42,9 @@ class AitexDataSet(Dataset):
                 mask_loc = os.path.join(self.mask_dir, mask_name)
                 mask = Image.open(mask_loc).convert('L')
                 tensor_mask = transform(mask)
-                return tensor_image, tensor_mask
+            else:
+                tensor_mask = torch.zeros([1, 256, 4096])
+            return tensor_image, tensor_mask
         else:
             return tensor_image
 
@@ -56,32 +58,39 @@ class AitexDataSet(Dataset):
 def augmentationDataset(dataset):
     ds = []
     widths = []
+    heights = []
     for i in range(len(dataset)):
         j = dataset.__getitem__(i)
 
         ds.append(j)                                                    # Original image
         widths.append(j.shape[2])
+        heights.append(j.shape[1])
 
         noised_image = b.add_noise(j, noise_factor=0.05)                # Gaussian noise
         ds.append(noised_image)
         widths.append(noised_image.shape[2])
+        heights.append(noised_image.shape[1])
 
         j = np.transpose(j.numpy(), (1, 2, 0))
         ds.append(torch.tensor(np.fliplr(j).copy()).permute(2, 0, 1))   # orizontal flip
         widths.append(j.shape[1])
+        heights.append(j.shape[0])
 
         ds.append(torch.tensor(np.flipud(j).copy()).permute(2, 0, 1))   # vertical flip
         widths.append(j.shape[1])
+        heights.append(j.shape[0])
 
         blurred = gaussian_filter(j, sigma=0.5)                         # blur
         ds.append(torch.tensor(blurred).permute(2, 0, 1))
         widths.append(j.shape[1])
+        heights.append(j.shape[0])
         
-    return ds, widths
+    return ds, widths, heights
 
-def resize(dataset, original_width, original_height, dataset_masks=False):
+def resizeAitex(dataset, original_width, original_height, dataset_masks=False):
     ds = []
     new_widths = []
+    new_heights = []
     if not dataset_masks:
         for img in dataset:
             img_ = img.squeeze(0).numpy()
@@ -100,10 +109,11 @@ def resize(dataset, original_width, original_height, dataset_masks=False):
                     vector[i] += edges[j][i]
             derivative = np.gradient(vector)
             max = np.argmax(derivative)
-            cut = (int(max/16) + CUT_PATCHES) * 16
+            cut = (int(max/patch_size) + CUT_PATCHES) * patch_size
 
             crop_img = transforms.functional.crop(img, top=0, left=cut, height=original_height, width=(original_width-cut))
             new_widths.append(crop_img.shape[2])
+            new_heights.append(crop_img.shape[1])
 
             ds.append(crop_img)
     else:
@@ -124,14 +134,15 @@ def resize(dataset, original_width, original_height, dataset_masks=False):
                     vector[i] += edges[j][i]
             derivative = np.gradient(vector)
             max = np.argmax(derivative)
-            cut = (int(max/16) + CUT_PATCHES) * 16
+            cut = (int(max/patch_size) + CUT_PATCHES) * patch_size
 
             crop_img = transforms.functional.crop(img[0], top=0, left=cut, height=original_height, width=(original_width-cut))
             new_widths.append(crop_img.shape[2])
+            new_heights.append(crop_img.shape[1])
 
             m = transforms.functional.crop(img[1], top=0, left=cut, height=original_height, width=(original_width-cut))
             ds.append([crop_img, m])
-    return ds, new_widths
+    return ds, new_widths, new_heights
 
 
 
